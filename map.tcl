@@ -7,7 +7,7 @@ namespace eval map {
     variable MapW
     variable outputdir
     foreach script {
-        const.tcl
+ 
     } {
         namespace inscope :: source $script
     }
@@ -44,13 +44,21 @@ proc map::gui {{parent {}}} {
     grid [button $f.btn_dir_browse -text "Browse" -command "map::select_dir $f.ent_dir"] -column 3 -row 2 -sticky wens
 
     #grid [button $f.btn_run -text "Run" -command "puts hello"] -column 2 -row 5 -sticky es
-    grid [button $f.btn_run -text "OK" -command "map::transfer "] -column 2 -row 5 -sticky es
+    grid [button $f.btn_run -text "OK" -command "map::StartMatrixWithProperty $w"] -column 2 -row 5 -sticky es
  #   grid [button $f.btn_run -text "Run" -command "map::transfer [$f.ent_cmd get] [$f.ent_dir get]"] -column 2 -row 5 -sticky es
     grid [button $f.btn_exit -text "Exit" -command "destroy $w" ] -column 3 -row 5 -sticky wens
     focus $f.ent_dir
 }
 
-
+proc map::StartMatrixWithProperty {w} {
+    variable MapH
+    variable MapW
+    
+    #Matrix::main $MapW $MapH
+    destroy $w
+    
+    
+}
 proc map::fileBrowse {w ent} {
     variable selected_type
     #   Type names		Extension(s)	Mac File Type(s)
@@ -91,4 +99,4 @@ proc map::select_dir {ent} {
 }
 
 
-map::gui
+#map::gui
