@@ -49,6 +49,8 @@ proc Matrix::line_sharp_create {x0 y0 x1 y1} {
     if {($x0 != $x1) || ($y0 != $y1)} {
         $maincanvas delete line_sharp
         $maincanvas create line $x0 $y0 $x1 $y1 -fill yellow2 -tags "line_sharp"
+        $maincanvas delete text_coord
+        Matrix::text_coord $x1 $y1 
     }
 }
 proc Matrix::line_create {coord {width 1}} {
@@ -64,6 +66,13 @@ proc Matrix::line_create {coord {width 1}} {
     } else {
         $maincanvas create line $coord -width $width -cap butt -join miter -dash $pat -fill $select_color -tags "line"
     }
+}
+################################################KKKKKKKKKKKKKKKKKKKK
+proc Matrix::text_coord {x y} {
+    variable maincanvas
+    set intx [expr int($x)]
+    set inty [expr int($y)] 
+    $maincanvas create text $x [expr $y-10] -text "($intx,$inty)" -fill yellow2 -tags "text_coord" -anchor sw
 }
 proc Matrix::text_create {sname txt coord {layer 0}} {
     variable maincanvas
@@ -315,15 +324,18 @@ proc Matrix::double_click_1 {x y} {
     set lastY [$maincanvas canvasy $y]
     switch -exact -- $mode {
         create_line_sharp {
+            set mode finished
             lappend line_coord $lastX
             lappend line_coord $lastY
             $maincanvas delete line_sharp
             $maincanvas delete line_sharp_rdy
-            Matrix::line_create $line_coord $linewidth
-            set mode finished
+            #$maincanvas delete text_coord
+            $maincanvas delete text_coord_line
+            Matrix::line_create $line_coord $linewidth           
             set line_coord {}
         }
         normal {
+
             puts "double click"
         }
     }
@@ -405,17 +417,22 @@ proc Matrix::coordmark {x y} {
         }
         create_box_enable {
             #puts "Matrix::box_create $lastX $lastY $boxwidth $boxheight 0"
+            Matrix::text_coord $lastX $lastY
             Matrix::box_create $lastX $lastY $boxwidth $boxheight 1
             set mode create_box_sharp
         }
         create_box_sharp {
             $maincanvas delete select_sharp
+            $maincanvas delete text_coord
             Matrix::box_create $lastX $lastY $boxwidth $boxheight 0
             set mode normal
         }
         create_line_enable {
             lappend line_coord $lastX
             lappend line_coord $lastY
+            $maincanvas addtag text_coord_line withtag text_coord
+            $maincanvas dtag text_coord 
+            #Matrix::text_coord $lastX $lastY
             set mode create_line_sharp
         }
         create_line_sharp {
@@ -423,6 +440,8 @@ proc Matrix::coordmark {x y} {
             lappend line_coord $lastY
             $maincanvas delete line_sharp
             $maincanvas delete line_sharp_rdy
+            $maincanvas addtag text_coord_line withtag text_coord
+            $maincanvas dtag text_coord
             $maincanvas create line $line_coord -fill yellow2 -tags "line_sharp_rdy"
         }
         
@@ -564,7 +583,11 @@ proc Matrix::mouse_move {x y} {
         create_box_sharp -
         copylayer_enable -
         movelayer_enable {
-            $maincanvas move select_sharp [expr {$x-$lastX}] [expr {$y-$lastY}]
+            $maincanvas move text_coord [expr {$x-$lastX}] [expr {$y-$lastY}]
+            set intx [expr int($x)]
+            set inty [expr int($y)]
+            $maincanvas itemconfigure text_coord -text "($intx,$inty)"
+            $maincanvas move select_sharp [expr {$x-$lastX}] [expr {$y-$lastY}]      
             set lastX $x
             set lastY $y
         }
@@ -576,6 +599,10 @@ proc Matrix::mouse_move {x y} {
         }
         ruler_enable {
             Matrix::creat_ruler $lastX $lastY $x $y
+        }
+        create_line_enable {
+            $maincanvas delete text_coord
+            Matrix::text_coord $x $y
         }
         create_line_sharp {
             Matrix::line_sharp_create $lastX $lastY $x $y
