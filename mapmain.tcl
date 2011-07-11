@@ -24,6 +24,7 @@ proc Matrix::box_create {startX startY width height {sharp 0}} {
     variable select_color
     variable select_stipple
     variable stippledata
+    variable cmdlist
 
     if {$sharp == "0"} {
         set filename [lindex [lsearch -index 0 -inline $stippledata $select_stipple] 1]
@@ -34,6 +35,13 @@ proc Matrix::box_create {startX startY width height {sharp 0}} {
                                         [expr $startX + $width] [expr $startY + $height] \
                                         $startX  [expr $startY + $height] \
         -width 1 -outline $select_color -stipple @[file join [pwd] images $filename] -fill $select_color -tags "box"]
+        set cmd "box $select_stipple $startX $startY \
+                                        [expr $startX + $width] $startY \
+                                        [expr $startX + $width] [expr $startY + $height] \
+                                        $startX  [expr $startY + $height] \
+                -width 1 -outline $select_color -fill $select_color "
+        puts $cmd
+        lappend cmdlist $cmd
     } else {
         $maincanvas create poly $startX $startY \
                                 [expr $startX + $width] $startY \
@@ -58,6 +66,8 @@ proc Matrix::line_create {coord {width 1}} {
     variable select_color
     variable select_dash
     variable dashdata
+    variable cmdlist
+
     set pat [lindex [lsearch -index 0 -inline $dashdata $select_dash] 1]
     set pat [string trim $pat "\""]
     puts "====> $pat"
@@ -66,6 +76,9 @@ proc Matrix::line_create {coord {width 1}} {
     } else {
         $maincanvas create line $coord -width $width -cap butt -join miter -dash $pat -fill $select_color -tags "line"
     }
+    set cmd "line $select_dash $coord -width $width -cap butt -join miter -fill $select_color"
+    puts $cmd
+    lappend cmdlist $cmd
 }
 ################################################KKKKKKKKKKKKKKKKKKKK
 proc Matrix::text_coord {x y} {
@@ -196,7 +209,15 @@ proc Matrix::Matrixinit {parent w h} {
     bind . <Escape> "Matrix::set_mode normal"
     bind . <Key-p> "Matrix::create_line_setting"
     bind . <Key-b> "Matrix::create_box_setting"
-   
+    bind . <Control-Key-s> "Matrix::save_map"
+}
+proc Matrix::save_map {} {
+    variable cmdlist
+    set outfile [open map.dat w]
+    foreach line $cmdlist {
+        puts $outfile $line
+    }
+    close $outfile
 }
 proc Matrix::create_box_setting {}  {
     variable boxwidth
