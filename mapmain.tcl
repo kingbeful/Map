@@ -209,11 +209,46 @@ proc Matrix::Matrixinit {parent w h} {
     bind . <Escape> "Matrix::set_mode normal"
     bind . <Key-p> "Matrix::create_line_setting"
     bind . <Key-b> "Matrix::create_box_setting"
+    bind . <Control-Key-l> "Matrix::load_map"
     bind . <Control-Key-s> "Matrix::save_map"
+}
+proc Matrix::load_map {} {
+    variable maincanvas
+    variable stippledata
+    variable dashdata
+    set infile [open map.dat r]
+    while { [gets $infile line] >= 0 } {
+        set type [lindex $line 0]
+        set style [lindex $line 1]
+        set parameter [lrange $line 2 end]
+        switch -exact -- $type {
+            box {
+                set filename [lindex [lsearch -index 0 -inline $stippledata $style] 1]
+                set filename [string trim $filename "\""]
+                #puts "====> $filename"
+                set cmd [concat $maincanvas create poly $parameter "-stipple @[file join [pwd] images $filename]" -tags "box"]
+                puts $cmd
+                eval $cmd
+            }
+            line {
+                set pat [lindex [lsearch -index 0 -inline $dashdata $style] 1]
+                set pat [string trim $pat "\""]
+                puts "====> $pat"
+                if {$pat == "0"} {
+                    set cmd [concat $maincanvas create line $parameter -tags "line"]
+                } else {
+                    set cmd [concat $maincanvas create line $parameter -tags "line" -dash $pat]
+                }
+                puts $cmd
+                eval $cmd
+            }
+        }
+    }
+    close $infile
 }
 proc Matrix::save_map {} {
     variable cmdlist
-    set outfile [open map.dat w]
+    set outfile [open map.dat a]
     foreach line $cmdlist {
         puts $outfile $line
     }
