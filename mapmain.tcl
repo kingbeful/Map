@@ -10,6 +10,10 @@ namespace eval Matrix {
     variable Ymax 0
     variable boxwidth 20
     variable boxheight 20
+    variable boxcol 1
+    variable boxrow 1
+    variable boxdx 10
+    variable boxdy 10
     variable linewidth 1
     variable polywidth 1
     foreach script {
@@ -25,6 +29,10 @@ proc Matrix::box_create {startX startY width height {sharp 0}} {
     variable select_color
     variable select_stipple
     variable stippledata
+    variable boxcol
+    variable boxrow
+    variable boxdx
+    variable boxdy
     variable cmdlist
 
     if {$sharp == "0"} {
@@ -239,7 +247,7 @@ proc Matrix::Matrixinit {parent w h} {
 #    bind . <Control-Key-k> "Matrix::clean_ruler"
 #    bind . <Key-f> "Matrix::Matrixfit"
     bind . <Escape> "Matrix::clean_aid_line;Matrix::set_mode normal"
-    bind . <Key-p> "Matrix::create_polygen_setting"
+    bind . <Key-p> "Matrix::create_polygon_setting"
     bind . <Key-l> "Matrix::create_line_setting"
     bind . <Key-b> "Matrix::create_box_setting"
     bind . <Control-Key-l> "Matrix::load_map"
@@ -258,6 +266,8 @@ proc Matrix::clean_aid_line {} {
     $maincanvas delete text_coord_poly
     set line_coord {}
     set poly_coord {}
+    
+    $maincanvas delete select_sharp
 }
 proc Matrix::load_map {} {
     variable maincanvas
@@ -312,6 +322,10 @@ proc Matrix::save_map {} {
 proc Matrix::create_box_setting {}  {
     variable boxwidth
     variable boxheight
+    variable boxcol
+    variable boxrow
+    variable boxdx
+    variable boxdy
     
     variable colorlist
     variable stipplelist
@@ -349,8 +363,31 @@ proc Matrix::create_box_setting {}  {
     }
     grid $stipple_mb -column 1 -row 3 -sticky news
 
-    grid [button $f.btn_ok -text "OK" -command "Matrix::SetBoxProperty $w $color_mb $stipple_mb"] -column 0 -row 4 -sticky es
-    grid [button $f.btn_exit -text "Cancel" -command "destroy $w" ] -column 1 -row 4 -sticky wens
+    grid [label $f.lbl_text -text "Text :"] -column 0 -row 4  -sticky wens
+    grid [entry $f.ent_txt -width 10 -textvariable Matrix::boxtxt ] -column 1 -row 4  -sticky wens
+    grid [label $f.lbl_txt_color -text "Color :"] -column 2 -row 4  -sticky wens
+    
+    set txt_color_mb [menubutton $f.txt_cmb -image red_layer -text red -compound left -direction below -menu $f.txt_cmb.m -relief raised -indicatoron yes]
+    set txt_cm [menu $txt_color_mb.m -tearoff 0]
+    foreach c $colorlist {
+        set layer $c\_layer
+        puts "layer = $layer"
+        $txt_cm add command -image $layer -compound left -command "$txt_color_mb configure -image $layer -text $c"
+    }
+    grid $txt_color_mb -column 3 -row 4 -sticky news
+
+    grid [label $f.lbl_col -text "Column(s) :"] -column 0 -row 5  -sticky wens
+    grid [entry $f.ent_col -width 8 -textvariable Matrix::boxcol ] -column 1 -row 5  -sticky wens
+    grid [label $f.lbl_row -text " Row(s)"] -column 2 -row 5  -sticky wens
+    grid [entry $f.ent_row -width 8 -textvariable Matrix::boxrow ] -column 3 -row 5  -sticky wens
+
+    grid [label $f.lbl_dx -text "Delta X :"] -column 0 -row 6 -sticky wens
+    grid [entry $f.ent_dx -width 8 -textvariable Matrix::boxdx ] -column 1 -row 6  -sticky wens
+    grid [label $f.lbl_dy -text " Delta Y"] -column 2 -row 6 -sticky wens
+    grid [entry $f.ent_dy -width 8 -textvariable Matrix::boxdy ] -column 3 -row 6 -sticky wens
+
+    grid [button $f.btn_ok -text "OK" -command "Matrix::SetBoxProperty $w $color_mb $stipple_mb"] -column 0 -row 7 -sticky es
+    grid [button $f.btn_exit -text "Cancel" -command "destroy $w" ] -column 1 -row 7 -sticky wens
 }
 proc Matrix::SetBoxProperty {w cmb smb} {
 
@@ -363,7 +400,7 @@ proc Matrix::SetBoxProperty {w cmb smb} {
     destroy $w
 }
 
-proc Matrix::create_polygen_setting {}  {
+proc Matrix::create_polygon_setting {}  {
     variable polywidth
 
     variable colorlist
@@ -400,10 +437,10 @@ proc Matrix::create_polygen_setting {}  {
     }
     grid $stipple_mb -column 1 -row 3 -sticky news
 
-    grid [button $f.btn_ok -text "OK" -command "Matrix::SetPolygenProperty $w $color_mb $stipple_mb"] -column 0 -row 4 -sticky es
+    grid [button $f.btn_ok -text "OK" -command "Matrix::SetPolygonProperty $w $color_mb $stipple_mb"] -column 0 -row 4 -sticky es
     grid [button $f.btn_exit -text "Cancel" -command "destroy $w" ] -column 1 -row 4 -sticky wens
 }
-proc Matrix::SetPolygenProperty {w cmb smb} {
+proc Matrix::SetPolygonProperty {w cmb smb} {
 
     variable select_color red
     variable select_stipple 0
@@ -519,6 +556,10 @@ proc Matrix::double_click_1 {x y} {
 proc Matrix::coordmark {x y} {
     variable boxwidth
     variable boxheight
+    variable boxcol
+    variable boxrow
+    variable boxdx
+    variable boxdy
     variable line_coord
     variable poly_coord
 
@@ -595,13 +636,34 @@ proc Matrix::coordmark {x y} {
         create_box_enable {
             #puts "Matrix::box_create $lastX $lastY $boxwidth $boxheight 0"
             Matrix::text_coord $lastX $lastY
-            Matrix::box_create $lastX $lastY $boxwidth $boxheight 1
+            if {$boxcol == 1 && $boxrow == 1} { 
+                Matrix::box_create $lastX $lastY $boxwidth $boxheight 1
+            } else {
+               for {set col 0} {$col<$boxcol} {incr col} {
+                   for {set row 0} {$row<$boxrow} {incr row} {
+                       Matrix::box_create [expr $lastX + (($boxwidth + $boxdx) * $col)] \
+                                          [expr $lastY + (($boxheight + $boxdy) * $row)] \
+                                          $boxwidth $boxheight 1
+                   }
+               }
+            }
             set mode create_box_sharp
         }
         create_box_sharp {
             $maincanvas delete select_sharp
             $maincanvas delete text_coord
-            Matrix::box_create $lastX $lastY $boxwidth $boxheight 0
+            if {$boxcol == 1 && $boxrow == 1} {
+                Matrix::box_create $lastX $lastY $boxwidth $boxheight 0
+            } else {
+               for {set col 0} {$col<$boxcol} {incr col} {
+                   for {set row 0} {$row<$boxrow} {incr row} {
+                       Matrix::box_create [expr $lastX + (($boxwidth + $boxdx) * $col)] \
+                                          [expr $lastY + (($boxheight + $boxdy) * $row)] \
+                                          $boxwidth $boxheight 0
+                   }
+               }
+            }
+#            Matrix::box_create $lastX $lastY $boxwidth $boxheight 0
             set mode normal
         }
         create_poly_enable {
