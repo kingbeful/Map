@@ -11,6 +11,7 @@ namespace eval Matrix {
     variable boxwidth 20
     variable boxheight 20
     variable linewidth 1
+    variable polywidth 1
     foreach script {
         const.tcl
         map.tcl
@@ -51,6 +52,37 @@ proc Matrix::box_create {startX startY width height {sharp 0}} {
     }
     
 }
+proc Matrix::poly_sharp_create {x0 y0 x1 y1} {
+    variable maincanvas
+    #variable line_coord
+    if {($x0 != $x1) || ($y0 != $y1)} {
+        $maincanvas delete poly_sharp
+        $maincanvas create line $x0 $y0 $x1 $y1 -fill yellow2 -tags "poly_sharp"
+        $maincanvas delete text_coord
+        Matrix::text_coord $x1 $y1 
+    }
+}
+proc Matrix::poly_create {coord {width 1} {sharp 0} } {
+    variable maincanvas
+    variable select_color
+    variable select_stipple
+    variable stippledata
+    variable cmdlist
+
+    if {$sharp == "0"} {
+        set filename [lindex [lsearch -index 0 -inline $stippledata $select_stipple] 1]
+        set filename [string trim $filename "\""]
+        puts "====> $filename"
+        set id [$maincanvas create polygon $coord -width $width\
+        -outline $select_color -stipple @[file join [pwd] images $filename] -fill $select_color -tags "poly"]
+        set cmd "poly $select_stipple  $coord -width $width -outline $select_color -fill $select_color "
+        puts $cmd
+        lappend cmdlist $cmd
+    } else {
+    }
+
+}
+
 proc Matrix::line_sharp_create {x0 y0 x1 y1} {
     variable maincanvas
     #variable line_coord
@@ -206,11 +238,26 @@ proc Matrix::Matrixinit {parent w h} {
 #    bind . <Key-o> "Matrix::set_mode rotatelayer"
 #    bind . <Control-Key-k> "Matrix::clean_ruler"
 #    bind . <Key-f> "Matrix::Matrixfit"
-    bind . <Escape> "Matrix::set_mode normal"
-    bind . <Key-p> "Matrix::create_line_setting"
+    bind . <Escape> "Matrix::clean_aid_line;Matrix::set_mode normal"
+    bind . <Key-p> "Matrix::create_polygen_setting"
+    bind . <Key-l> "Matrix::create_line_setting"
     bind . <Key-b> "Matrix::create_box_setting"
     bind . <Control-Key-l> "Matrix::load_map"
     bind . <Control-Key-s> "Matrix::save_map"
+}
+proc Matrix::clean_aid_line {} {
+    variable maincanvas
+    variable line_coord
+    variable poly_coord
+    $maincanvas delete line_sharp
+    $maincanvas delete line_sharp_rdy
+    $maincanvas delete poly_sharp
+    $maincanvas delete poly_sharp_rdy
+    $maincanvas delete text_coord
+    $maincanvas delete text_coord_line
+    $maincanvas delete text_coord_poly
+    set line_coord {}
+    set poly_coord {}
 }
 proc Matrix::load_map {} {
     variable maincanvas
@@ -239,6 +286,14 @@ proc Matrix::load_map {} {
                 } else {
                     set cmd [concat $maincanvas create line $parameter -tags "line" -dash $pat]
                 }
+                puts $cmd
+                eval $cmd
+            }
+            poly {
+                set filename [lindex [lsearch -index 0 -inline $stippledata $style] 1]
+                set filename [string trim $filename "\""]
+                #puts "====> $filename"
+                set cmd [concat $maincanvas create polygon $parameter "-stipple @[file join [pwd] images $filename]" -tags "poly"]
                 puts $cmd
                 eval $cmd
             }
@@ -307,6 +362,58 @@ proc Matrix::SetBoxProperty {w cmb smb} {
     Matrix::set_mode create_box_enable
     destroy $w
 }
+
+proc Matrix::create_polygen_setting {}  {
+    variable polywidth
+
+    variable colorlist
+    variable stipplelist
+
+    set w .polydiag
+    toplevel $w
+    wm title $w "Create Polygen Setting"
+    set f [frame $w.f -width 150 -height 70]
+    grid $f -column 0 -row 0 -sticky news
+    grid columnconfigure . 0 -weight 1
+    grid rowconfigure . 0 -weight 1
+
+    grid [label $f.lbl_size -text "Width :"] -column 0 -row 1  -sticky wens
+    grid [entry $f.ent_wd -width 8 -textvariable Matrix::polywidth ] -column 1 -row 1  -sticky wens
+    grid [label $f.lbl_color -text "Color :"] -column 0 -row 2  -sticky wens
+
+    set color_mb [menubutton $f.cmb -image red_layer -text red -compound left -direction below -menu $f.cmb.m -relief raised -indicatoron yes]
+    set cm [menu $color_mb.m -tearoff 0]
+    foreach c $colorlist {
+        set layer $c\_layer
+        puts "layer = $layer"
+        $cm add command -image $layer -compound left -command "$color_mb configure -image $layer -text $c"
+    }
+    grid $color_mb -column 1 -row 2 -sticky news
+
+    grid [label $f.lbl_stipple -text "Stipple :"] -column 0 -row 3  -sticky wens
+    set stipple_mb [menubutton $f.smb -image stipple_0 -text 0 -compound left -direction below -menu $f.smb.m -relief raised -indicatoron yes]
+    set sm [menu $stipple_mb.m -tearoff 0]
+    foreach s $stipplelist {
+        set stipple stipple_$s
+        puts "stipple = $stipple"
+        $sm add command -image $stipple -compound left -command "$stipple_mb configure -image $stipple -text $s"
+    }
+    grid $stipple_mb -column 1 -row 3 -sticky news
+
+    grid [button $f.btn_ok -text "OK" -command "Matrix::SetPolygenProperty $w $color_mb $stipple_mb"] -column 0 -row 4 -sticky es
+    grid [button $f.btn_exit -text "Cancel" -command "destroy $w" ] -column 1 -row 4 -sticky wens
+}
+proc Matrix::SetPolygenProperty {w cmb smb} {
+
+    variable select_color red
+    variable select_stipple 0
+    set select_color [lindex [$cmb configure -text] 4]
+    set select_stipple [lindex [$smb configure -text] 4]
+    puts "select_color: $select_color | select_stipple : $select_stipple"
+    Matrix::set_mode create_poly_enable
+    destroy $w
+}
+
 proc Matrix::create_line_setting {} {
     variable linewidth
     variable colorlist
@@ -369,7 +476,9 @@ proc Matrix::set_mode {m} {
 }
 proc Matrix::double_click_1 {x y} {
     variable line_coord
+    variable poly_coord
     variable linewidth
+    variable polywidth
     variable maincanvas
     variable mode
     variable lastX
@@ -390,6 +499,17 @@ proc Matrix::double_click_1 {x y} {
             Matrix::line_create $line_coord $linewidth           
             set line_coord {}
         }
+        create_poly_sharp {
+            set mode finished
+            lappend poly_coord $lastX
+            lappend poly_coord $lastY
+            $maincanvas delete poly_sharp
+            $maincanvas delete poly_sharp_rdy
+            #$maincanvas delete text_coord
+            $maincanvas delete text_coord_poly
+            Matrix::poly_create $poly_coord $polywidth
+            set poly_coord {}
+        }
         normal {
 
             puts "double click"
@@ -400,6 +520,7 @@ proc Matrix::coordmark {x y} {
     variable boxwidth
     variable boxheight
     variable line_coord
+    variable poly_coord
 
     variable maincanvas
     variable mode
@@ -482,6 +603,23 @@ proc Matrix::coordmark {x y} {
             $maincanvas delete text_coord
             Matrix::box_create $lastX $lastY $boxwidth $boxheight 0
             set mode normal
+        }
+        create_poly_enable {
+            lappend poly_coord $lastX
+            lappend poly_coord $lastY
+            $maincanvas addtag text_coord_poly withtag text_coord
+            $maincanvas dtag text_coord
+            #Matrix::text_coord $lastX $lastY
+            set mode create_poly_sharp
+        }
+        create_poly_sharp {
+            lappend poly_coord $lastX
+            lappend poly_coord $lastY
+            $maincanvas delete poly_sharp
+            $maincanvas delete poly_sharp_rdy
+            $maincanvas addtag text_coord_poly withtag text_coord
+            $maincanvas dtag text_coord
+            $maincanvas create line $poly_coord -fill yellow2 -tags "poly_sharp_rdy"
         }
         create_line_enable {
             lappend line_coord $lastX
@@ -655,6 +793,13 @@ proc Matrix::mouse_move {x y} {
         }
         ruler_enable {
             Matrix::creat_ruler $lastX $lastY $x $y
+        }
+        create_poly_enable {
+            $maincanvas delete text_coord
+            Matrix::text_coord $x $y
+        }
+        create_poly_sharp {
+            Matrix::poly_sharp_create $lastX $lastY $x $y
         }
         create_line_enable {
             $maincanvas delete text_coord
