@@ -127,11 +127,26 @@ proc Matrix::text_coord {x y} {
     set inty [expr int($y)] 
     $maincanvas create text $x [expr $y-10] -text "($intx,$inty)" -fill yellow2 -tags "text_coord" -anchor sw
 }
-proc Matrix::text_create {sname txt coord {layer 0}} {
+###
+## color == 0 --> using default color
+## color == 1 --> using the select color
+###
+proc Matrix::text_create {coord tag {color "default"}} {
     variable maincanvas
-    variable Layer_colour
-    set c [lindex $Layer_colour $layer]
-    set id [$maincanvas create text $coord -text $txt -fill $c -tags "item text $sname" ]
+    variable select_color
+    variable txt_val
+    variable cmdlist
+#    variable Layer_colour
+    if {$color == "default"} {
+        set c yellow2
+        $maincanvas create text $coord -text $txt_val -fill $c -tags $tag
+    } else {
+        set c $select_color
+        $maincanvas create text $coord -text $txt_val -fill $c -tags $tag
+        set cmd "text no_stipple $coord -text $txt_val -fill $c -tags {$tag}"
+        puts $cmd
+        lappend cmdlist $cmd
+    }
 }
 
 proc Matrix::LoadImage {} {
@@ -244,6 +259,7 @@ proc Matrix::Matrixinit {parent w h} {
 #    bind . <Control-Key-k> "Matrix::clean_ruler"
 #    bind . <Key-f> "Matrix::Matrixfit"
     bind . <Escape> "Matrix::clean_aid_line;Matrix::set_mode normal"
+    bind . <Key-t> "Matrix::create_text_setting"
     bind . <Key-p> "Matrix::create_polygon_setting"
     bind . <Key-l> "Matrix::create_line_setting"
     bind . <Key-b> "Matrix::create_box_setting"
@@ -304,6 +320,11 @@ proc Matrix::load_map {} {
                 puts $cmd
                 eval $cmd
             }
+            text {
+                set cmd [concat $maincanvas create text $parameter]
+                puts $cmd
+                eval $cmd
+            }
         }
     }
     close $infile
@@ -315,6 +336,41 @@ proc Matrix::save_map {} {
         puts $outfile $line
     }
     close $outfile
+}
+proc Matrix::create_text_setting {}  {
+    variable txt_val
+    variable colorlist
+    set w .polydiag
+    toplevel $w
+    wm title $w "Create Text Setting"
+    set f [frame $w.txtframe -width 150 -height 70]
+    grid $f -column 0 -row 0 -sticky news
+    grid columnconfigure . 0 -weight 1
+    grid rowconfigure . 0 -weight 1
+
+    grid [label $f.lbl_text -text "Text :"] -column 0 -row 1  -sticky wens
+    grid [entry $f.ent_txt -width 30 -textvariable Matrix::txt_val ] -column 1 -row 1 -sticky wens
+    grid [label $f.lbl_txt_color -text "Color :"] -column 0 -row 2  -sticky wens
+
+    set txt_color_mb [menubutton $f.txt_cmb -image red_layer -text red -compound left -direction below -menu $f.txt_cmb.m -relief raised -indicatoron yes]
+    set txt_cm [menu $txt_color_mb.m -tearoff 0]
+    foreach c $colorlist {
+        set layer $c\_layer
+        puts "layer = $layer"
+        $txt_cm add command -image $layer -compound left -command "$txt_color_mb configure -image $layer -text $c"
+    }
+    grid $txt_color_mb -column 1 -row 2 -sticky news
+    grid [button $f.btn_ok -text "OK" -command "Matrix::SetTextProperty $w $txt_color_mb"] -column 0 -row 3 -sticky es
+    grid [button $f.btn_exit -text "Cancel" -command "destroy $w" ] -column 1 -row 3 -sticky ens
+
+}
+proc Matrix::SetTextProperty {w cmb} {
+
+    variable select_color red
+    set select_color [lindex [$cmb configure -text] 4]
+    puts "select_color: $select_color"
+    Matrix::set_mode create_text_enable
+    destroy $w
 }
 proc Matrix::create_box_setting {}  {
     variable boxwidth
@@ -575,6 +631,15 @@ proc Matrix::coordmark {x y} {
     set lastX [$maincanvas canvasx $x]
     set lastY [$maincanvas canvasy $y]
     switch -exact -- $mode {
+        create_text_enable {
+            Matrix::text_create "$lastX $lastY" text_tmp default
+            set mode create_text_sharp
+        }
+        create_text_sharp {
+            $maincanvas delete text_tmp
+            Matrix::text_create "$lastX $lastY" "text txt" not_def
+            set mode normal
+        }
         create_box_enable {
             #puts "Matrix::box_create $lastX $lastY $boxwidth $boxheight 0"
             Matrix::text_coord $lastX $lastY
@@ -661,6 +726,11 @@ proc Matrix::mouse_move {x y} {
             set inty [expr int($y)]
             $maincanvas itemconfigure text_coord -text "($intx,$inty)"
             $maincanvas move select_sharp [expr {$x-$lastX}] [expr {$y-$lastY}]      
+            set lastX $x
+            set lastY $y
+        }
+        create_text_sharp {
+            $maincanvas move text_tmp [expr {$x-$lastX}] [expr {$y-$lastY}]
             set lastX $x
             set lastY $y
         }
