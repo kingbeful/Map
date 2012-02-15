@@ -133,11 +133,8 @@ proc Matrix::text_create {sname txt coord {layer 0}} {
     set c [lindex $Layer_colour $layer]
     set id [$maincanvas create text $coord -text $txt -fill $c -tags "item text $sname" ]
 }
-proc Matrix::Matrixcreate {} {
-    variable maincanvas
 
-}
-proc Matrix::CreateImage {} {
+proc Matrix::LoadImage {} {
     variable colordata
     variable stippledata
     variable dashdata
@@ -212,7 +209,7 @@ proc Matrix::Matrixinit {parent w h} {
     variable scale_rate 1
 
 ###########
-    Matrix::CreateImage
+    Matrix::LoadImage
 
     set maincanvas [canvas $parent.can -bg black -borderwidth 0 -width $w -height $h]
     
@@ -578,61 +575,6 @@ proc Matrix::coordmark {x y} {
     set lastX [$maincanvas canvasx $x]
     set lastY [$maincanvas canvasy $y]
     switch -exact -- $mode {
-        copylayer -
-        rotatelayer -
-        movelayer {
-            set mode sel_layer
-            set startX $lastX
-            set startY $lastY
-        }
-        area_sel_rdy {
-            set mode $bk_mode\_enable
-            set startX $lastX
-            set startY $lastY
-        }
-        rotatelayer_enable {
-            $maincanvas delete select_sharp
-            Matrix::rotate_selected $startX $startY
-            $maincanvas dtag selected
-            set mode finished
-        }
-        copylayer_enable {
-            $maincanvas delete select_sharp
-            Matrix::dup_selected
-            $maincanvas move selected [expr $lastX - $startX] [expr $lastY - $startY]
-            $maincanvas dtag selected
-            set mode finished
-        }
-        movelayer_enable {
-            #if { $restore_cmd != {} } {
-            #    puts $restore_cmd
-            #    foreach cmd $restore_cmd {
-            #        eval $cmd
-            #    }
-            #    set restore_cmd {}
-            #}
-            $maincanvas delete select_sharp
-            #KKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKK
-            $maincanvas move selected [expr $lastX - $startX] [expr $lastY - $startY]        
-            $maincanvas dtag selected
-            set mode finished
-        }
-        rectangle {
-            set mode $bk_mode\_enable
-        }
-        rectangle_enable {
-            $maincanvas addtag item withtag rect
-            $maincanvas dtag rect
-            set mode finished
-        }
-        ruler {
-            set mode $bk_mode\_enable
-        }
-        ruler_enable {
-            set mode finished
-            $maincanvas addtag ruler_rdy withtag ruler
-            $maincanvas dtag ruler 
-        }
         create_box_enable {
             #puts "Matrix::box_create $lastX $lastY $boxwidth $boxheight 0"
             Matrix::text_coord $lastX $lastY
@@ -703,130 +645,7 @@ proc Matrix::coordmark {x y} {
         
     }
 }
-proc Matrix::create_sel_sharp {tag} {
-    variable maincanvas
-    set coord [$maincanvas coords $tag]
-    set type [$maincanvas type $tag]
-    if { $type == "text" } {
-        set txt [lindex [$maincanvas itemconfigure $tag -text] 4]
-        $maincanvas creat $type $coord -fill yellow2 -text $txt -tag select_sharp
-    } elseif { $type == "line" } {
-        $maincanvas creat $type $coord -fill yellow2 -tag select_sharp
-    } else {
-        $maincanvas creat $type $coord -outline yellow2 -fill {} -tag select_sharp
-    }
-}
-proc Matrix::select_item {x y} {
-    variable maincanvas
-    variable mode
-    variable bk_mode
-    #variable select_rdy
-    #variable area_sel
-    variable restore_cmd
-    set x [$maincanvas canvasx $x]
-    set y [$maincanvas canvasx $y]
-    switch -exact -- $mode {
-        area_sel {
-            set restore_cmd {}
-            set cmd [concat $maincanvas addtag selected enclosed [$maincanvas bbox select_box] ]
-            eval $cmd
-            #$maincanvas dtag  select_box
-            $maincanvas delete select_box
-            set sel_list [$maincanvas find withtag selected]
-            #$maincanvas dtag  selected
-            foreach sel $sel_list {
 
-                 Matrix::create_sel_sharp $sel
-                 #set type [$maincanvas type $sel]
-                 #if { $type == "text" || $type == "line" } {
-                 #    set fillcolor [lindex [$maincanvas itemconfigure $sel -fill] 4]
-                 #    lappend restore_cmd [list $maincanvas itemconfigure $sel -fill $fillcolor]
-                 #    $maincanvas itemconfigure $sel -fill yellow2
-                 #} else {
-                 #    set outlinecolor [lindex [$maincanvas itemconfigure $sel -outline] 4]
-                 #    lappend restore_cmd [list $maincanvas itemconfigure $sel -outline $outlinecolor]
-                 #    $maincanvas itemconfigure $sel -outline yellow2
-                 #}
-            }
-            if { $sel_list == {} } {
-                set mode $bk_mode
-            } else {
-                set mode area_sel_rdy
-            }
-        } 
-        sel_layer {
-            set type [$maincanvas type current]
-            if {$type != {} } {
-                set sel [$maincanvas find closest $x $y]
-                $maincanvas addtag selected withtag $sel
-                Matrix::create_sel_sharp $sel
-                #if { $type == "text" || $type == "line" } {
-                #    set fillcolor [lindex [$maincanvas itemconfigure $sel -fill] 4]
-                #    lappend restore_cmd [list $maincanvas itemconfigure $sel -fill $fillcolor]
-                #    $maincanvas itemconfigure $sel -fill yellow2
-                #    $maincanvas addtag selected withtag $sel
-                #} else {
-                #    set outlinecolor [lindex [$maincanvas itemconfigure $sel -outline] 4]
-                #    lappend restore_cmd [list $maincanvas itemconfigure $sel -outline $outlinecolor]
-                #    $maincanvas itemconfigure $sel -outline yellow2
-                #    $maincanvas addtag selected withtag $sel
-                #}
-                set mode $bk_mode\_enable
-            } else {
-                set mode $bk_mode
-            }
-        }
-        finished {
-            set mode $bk_mode
-        }
-        #rect_finished {
-        #    set mode rectangle
-        #}
-        #rectangle {
-        #    set mode rect_enable
-        #}
-        #ruler_end {
-        #    set mode ruler
-        #}
-    }
-}
-proc Matrix::mouse_drag {x y} {
-    variable maincanvas
-    #variable select_rdy
-    #variable area_sel
-    variable mode
-    variable restore_cmd
-    variable lastX
-    variable lastY
-    set x [$maincanvas canvasx $x]
-    set y [$maincanvas canvasy $y]
-    switch -exact -- $mode {
-        sel_layer -
-        area_sel {
-            if {($lastX != $x) && ($lastY != $y)} {
-                $maincanvas delete select_box
-                $maincanvas addtag select_box withtag [$maincanvas create rect $lastX $lastY $x $y -outline yellow2 -dash .]
-                set mode area_sel
-            }
-        }
-        movelayer_enable {
-            #if { $restore_cmd != {} } {
-            #    puts $restore_cmd
-            #    foreach cmd $restore_cmd {
-            #        eval $cmd
-            #    }
-            #    set restore_cmd {}
-            #}
-            $maincanvas delete select_sharp
-            $maincanvas dtag selected
-            set mode area_sel
-        }
-        
-        normal {
-
-        }
-    }
-}
 proc Matrix::mouse_move {x y} {
     variable maincanvas
     variable select_rdy
@@ -836,9 +655,7 @@ proc Matrix::mouse_move {x y} {
     set x [$maincanvas canvasx $x]
     set y [$maincanvas canvasy $y]
     switch -exact -- $mode {
-        create_box_sharp -
-        copylayer_enable -
-        movelayer_enable {
+        create_box_sharp {
             $maincanvas move text_coord [expr {$x-$lastX}] [expr {$y-$lastY}]
             set intx [expr int($x)]
             set inty [expr int($y)]
@@ -846,15 +663,6 @@ proc Matrix::mouse_move {x y} {
             $maincanvas move select_sharp [expr {$x-$lastX}] [expr {$y-$lastY}]      
             set lastX $x
             set lastY $y
-        }
-        rectangle_enable {
-            if {($lastX != $x) && ($lastY != $y)} {
-                $maincanvas delete rect
-                $maincanvas addtag rect withtag [$maincanvas create rect $lastX $lastY $x $y -outline gray70 -stipple @[file join [pwd] images gray25.xbm] -fill gray70]
-            }
-        }
-        ruler_enable {
-            Matrix::creat_ruler $lastX $lastY $x $y
         }
         create_poly_enable {
             $maincanvas delete text_coord
