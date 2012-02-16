@@ -133,7 +133,7 @@ proc Matrix::text_coord {x y} {
 ###
 proc Matrix::text_create {coord tag {color "default"}} {
     variable maincanvas
-    variable select_color
+    variable text_color
     variable txt_val
     variable cmdlist
 #    variable Layer_colour
@@ -141,7 +141,7 @@ proc Matrix::text_create {coord tag {color "default"}} {
         set c yellow2
         $maincanvas create text $coord -text $txt_val -fill $c -tags $tag
     } else {
-        set c $select_color
+        set c $text_color
         $maincanvas create text $coord -text $txt_val -fill $c -tags $tag
         set cmd "text no_stipple $coord -text $txt_val -fill $c -tags {$tag}"
         puts $cmd
@@ -366,9 +366,9 @@ proc Matrix::create_text_setting {}  {
 }
 proc Matrix::SetTextProperty {w cmb} {
 
-    variable select_color red
-    set select_color [lindex [$cmb configure -text] 4]
-    puts "select_color: $select_color"
+    variable text_color red
+    set text_color [lindex [$cmb configure -text] 4]
+    puts "text_color: $text_color"
     Matrix::set_mode create_text_enable
     destroy $w
 }
@@ -380,6 +380,8 @@ proc Matrix::create_box_setting {}  {
     variable boxdx
     variable boxdy
     
+    variable txt_val
+
     variable colorlist
     variable stipplelist
 
@@ -417,7 +419,7 @@ proc Matrix::create_box_setting {}  {
     grid $stipple_mb -column 1 -row 3 -sticky news
 
     grid [label $f.lbl_text -text "Text :"] -column 0 -row 4  -sticky wens
-    grid [entry $f.ent_txt -width 10 -textvariable Matrix::boxtxt ] -column 1 -row 4  -sticky wens
+    grid [entry $f.ent_txt -width 10 -textvariable Matrix::txt_val ] -column 1 -row 4  -sticky wens
     grid [label $f.lbl_txt_color -text "Color :"] -column 2 -row 4  -sticky wens
     
     set txt_color_mb [menubutton $f.txt_cmb -image red_layer -text red -compound left -direction below -menu $f.txt_cmb.m -relief raised -indicatoron yes]
@@ -439,16 +441,18 @@ proc Matrix::create_box_setting {}  {
     grid [label $f.lbl_dy -text " Delta Y"] -column 2 -row 6 -sticky wens
     grid [entry $f.ent_dy -width 8 -textvariable Matrix::boxdy ] -column 3 -row 6 -sticky wens
 
-    grid [button $f.btn_ok -text "OK" -command "Matrix::SetBoxProperty $w $color_mb $stipple_mb"] -column 0 -row 7 -sticky es
+    grid [button $f.btn_ok -text "OK" -command "Matrix::SetBoxProperty $w $color_mb $stipple_mb $txt_color_mb"] -column 0 -row 7 -sticky es
     grid [button $f.btn_exit -text "Cancel" -command "destroy $w" ] -column 1 -row 7 -sticky wens
 }
-proc Matrix::SetBoxProperty {w cmb smb} {
-
+proc Matrix::SetBoxProperty {w cmb smb tmb} {
+    variable text_color red
     variable select_color red
     variable select_stipple 0
     set select_color [lindex [$cmb configure -text] 4]
     set select_stipple [lindex [$smb configure -text] 4]
     puts "select_color: $select_color | select_stipple : $select_stipple"
+    set text_color [lindex [$tmb configure -text] 4]
+    puts "text_color: $text_color"
     Matrix::set_mode create_box_enable
     destroy $w
 }
@@ -661,12 +665,18 @@ proc Matrix::coordmark {x y} {
             $maincanvas delete text_coord
             if {$boxcol == 1 && $boxrow == 1} {
                 Matrix::box_create $lastX $lastY $boxwidth $boxheight 0
+                set txtX [expr $lastX + ($boxwidth / 2)]
+                set txtY [expr $lastY + ($boxheight / 2)]
+                Matrix::text_create "$txtX $txtY" "text box_txt" not_def
             } else {
                for {set col 0} {$col<$boxcol} {incr col} {
                    for {set row 0} {$row<$boxrow} {incr row} {
                        Matrix::box_create [expr $lastX + (($boxwidth + $boxdx) * $col)] \
                                           [expr $lastY + (($boxheight + $boxdy) * $row)] \
                                           $boxwidth $boxheight 0
+                       set txtX [expr $lastX + (($boxwidth + $boxdx) * $col) + ($boxwidth / 2)]
+                       set txtY [expr $lastY + (($boxheight + $boxdy) * $row) + ($boxheight / 2)]
+                       Matrix::text_create "$txtX $txtY" "text box_txt" not_def
                    }
                }
             }
